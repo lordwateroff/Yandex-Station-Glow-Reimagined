@@ -50,7 +50,7 @@ func serve(addr string, e *engine, fw *firmwareWatch) error {
 		writeJSON(w, e.audio.snapshot())
 	})
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, e.settings())
+		writeJSON(w, e.view())
 	})
 	mux.HandleFunc("POST /api/state", func(w http.ResponseWriter, r *http.Request) {
 		s := e.settings()
@@ -61,7 +61,8 @@ func serve(addr string, e *engine, fw *firmwareWatch) error {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, e.update(s))
+		e.update(s)
+		writeJSON(w, e.view())
 	})
 	// live mirror of the panel: one line per frame, 88 sRGB colours + whether Alice has the panel
 	mux.HandleFunc("GET /api/live", func(w http.ResponseWriter, r *http.Request) {
@@ -83,9 +84,15 @@ func serve(addr string, e *engine, fw *firmwareWatch) error {
 				fr := e.frame()
 				sb.Reset()
 				sb.WriteString("data: ")
-				if fw.busy.Load() {
+				// first character: who has the panel. A Alice, N night mode, I asleep after idling, - us
+				switch v := e.view(); {
+				case fw.busy.Load():
 					sb.WriteByte('A')
-				} else {
+				case v.Sleep == "night":
+					sb.WriteByte('N')
+				case v.Sleep == "idle":
+					sb.WriteByte('I')
+				default:
 					sb.WriteByte('-')
 				}
 				for _, c := range fr {

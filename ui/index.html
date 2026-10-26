@@ -222,6 +222,15 @@ input[type=range]:focus-visible{outline-offset:0}
 .yield b{display:block;font-size:var(--text-base);font-weight:500;color:var(--color-ink)}
 .yield .switch{box-shadow:none;padding:0}
 .yield .switch:hover,.yield .switch:active{background:transparent}
+.field{
+  appearance:none;border:0;min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-well);
+  background:var(--color-paper-3);color:var(--color-ink);font:500 var(--text-sm)/1 var(--font-body);cursor:pointer;
+  transition:background-color var(--dur-short) var(--ease-out);
+}
+.field:hover{background:var(--color-off)}
+.field:disabled{opacity:.45;cursor:not-allowed}
+.times{display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center}
+.times label{display:flex;align-items:center;gap:var(--space-2);font-weight:400;color:var(--color-muted)}
 
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}}
@@ -286,6 +295,21 @@ input[type=range]:focus-visible{outline-offset:0}
           <div class="yield slider">
             <p><b id="yieldLabel">Уступать Алисе</b>Пока Алиса слушает и отвечает, панель показывает её анимацию</p>
             <button class="switch" id="yield" role="switch" aria-checked="true" aria-labelledby="yieldLabel" disabled><span class="knob" aria-hidden="true"></span></button>
+          </div>
+          <div class="yield slider">
+            <p><b id="idleLabel">Гасить без дела</b>Если ничего не играет и настройки не трогали. Включится от звука или любого изменения</p>
+            <select class="field" id="idle" aria-labelledby="idleLabel" disabled>
+              <option value="0">Никогда</option><option value="15">15 мин</option><option value="30">30 мин</option>
+              <option value="60">1 час</option><option value="120">2 часа</option>
+            </select>
+          </div>
+          <div class="yield slider">
+            <p><b id="nightLabel">Ночной режим</b>В эти часы панель не горит, по времени вашего телефона</p>
+            <button class="switch" id="night" role="switch" aria-checked="false" aria-labelledby="nightLabel" disabled><span class="knob" aria-hidden="true"></span></button>
+          </div>
+          <div class="slider times" id="nightTimes" hidden>
+            <label>с <input class="field" type="time" id="nightFrom"></label>
+            <label>до <input class="field" type="time" id="nightTo"></label>
           </div>
         </div>
       </section>
@@ -423,6 +447,12 @@ function render() {
   $("spdOut").textContent = "×" + Math.pow(4, 2*st.speed - 1).toFixed(2).replace(/\.?0+$/,"");
 
   const y = $("yield"); y.disabled = false; y.setAttribute("aria-checked", st.yield);
+  const idle = $("idle"); idle.disabled = false;
+  if (![...idle.options].some(o => +o.value === st.idleOff)) idle.add(new Option(st.idleOff + " мин", st.idleOff));
+  idle.value = String(st.idleOff);
+  const nt = $("night"); nt.disabled = false; nt.setAttribute("aria-checked", st.night);
+  $("nightTimes").hidden = !st.night;
+  for (const id of ["nightFrom", "nightTo"]) if (document.activeElement !== $(id)) $(id).value = st[id];
   const pw = $("power"); pw.disabled = false; pw.setAttribute("aria-checked", st.power);
   $("powerText").textContent = st.power ? "Свет включён" : "Свет выключен";
 }
@@ -500,6 +530,12 @@ $("hue").oninput = e => push({color: hueToHex(+e.target.value)});
 $("bri").oninput = e => push({brightness: e.target.value/100});
 $("spd").oninput = e => push({speed: e.target.value/100});
 $("yield").onclick = () => push({yield: !st.yield});
+// the speaker runs on UTC: every night-mode edit carries this phone's offset
+const tz = () => -new Date().getTimezoneOffset();
+$("idle").onchange = e => push({idleOff: +e.target.value});
+$("night").onclick = () => push({night: !st.night, tz: tz()});
+$("nightFrom").onchange = e => { if (e.target.value) push({nightFrom: e.target.value, tz: tz()}); };
+$("nightTo").onchange = e => { if (e.target.value) push({nightTo: e.target.value, tz: tz()}); };
 $("power").onclick = () => push({power: !st.power});
 
 // ---- live mirror ----
@@ -568,7 +604,12 @@ function draw(line) {
   const m = Math.max(ar, ag, ab, 1), root = document.documentElement.style;
   root.setProperty("--glow", `${Math.round(ar/m*255)},${Math.round(ag/m*255)},${Math.round(ab/m*255)}`);
   root.setProperty("--glow-a", Math.min(1, m/88/150).toFixed(3));
-  setStatus(alice ? "Сейчас панель у Алисы, свет вернётся, когда она закончит" : st && !st.power ? "Свет выключен, панель отдана колонке" : "");
+  const who = line[0];
+  setStatus(alice ? "Сейчас панель у Алисы, свет вернётся, когда она закончит"
+    : st && !st.power ? "Свет выключен, панель отдана колонке"
+    : who === "N" && st ? `Ночной режим, панель погашена до ${st.nightTo}`
+    : who === "I" ? "Панель уснула без дела, проснётся от звука или любого изменения"
+    : "");
 }
 
 let es = null;

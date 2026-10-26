@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestLayout(t *testing.T) {
@@ -161,5 +162,27 @@ func TestCustomPalette(t *testing.T) {
 	s.sanitize()
 	if len(s.Custom) < 2 {
 		t.Fatalf("custom palette left with %d colours", len(s.Custom))
+	}
+}
+
+func TestNightWindow(t *testing.T) {
+	s := defaults
+	s.Night, s.NightFrom, s.NightTo, s.TZ = true, "23:00", "07:00", 5*60 // UTC+5
+	at := func(hm string) time.Time {                                    // owner's local time -> UTC
+		m, _ := clockMinutes(hm)
+		return time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC).Add(time.Duration(m-s.TZ) * time.Minute)
+	}
+	for hm, want := range map[string]bool{"22:59": false, "23:00": true, "02:30": true, "06:59": true, "07:00": false, "12:00": false} {
+		if got := s.isNight(at(hm)); got != want {
+			t.Errorf("%s local: night=%v, want %v", hm, got, want)
+		}
+	}
+	s.NightFrom, s.NightTo = "13:00", "15:00" // a window inside one day
+	if !s.isNight(at("14:00")) || s.isNight(at("15:30")) {
+		t.Errorf("same-day window wrong")
+	}
+	s.Night = false
+	if s.isNight(at("14:00")) {
+		t.Errorf("night mode off but window applied")
 	}
 }

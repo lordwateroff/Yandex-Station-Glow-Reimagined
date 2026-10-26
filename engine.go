@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -21,12 +22,48 @@ type settings struct {
 	Brightness float64  `json:"brightness"` // 0..1, perceptual
 	Yield      bool     `json:"yield"`      // give the panel to Alice while she uses it
 	Custom     []string `json:"custom"`     // the owner's own palette, 2..5 colours, used when Palette is "custom"
+
+	IdleOff   int    `json:"idleOff"`   // minutes without sound or edits before the panel fades out; 0 = never
+	Night     bool   `json:"night"`     // keep the panel dark between NightFrom and NightTo
+	NightFrom string `json:"nightFrom"` // "HH:MM", the owner's local time
+	NightTo   string `json:"nightTo"`
+	TZ        int    `json:"tz"` // the owner's offset from UTC in minutes (the speaker runs on UTC)
+}
+
+// sleepView is the state as the web panel reads it: the settings plus why the panel is dark, if it is.
+type sleepView struct {
+	settings
+	Sleep string `json:"sleep"` // "", "idle" or "night"
 }
 
 const customPalette = "custom"
 
 var defaults = settings{Power: true, Effect: "aurora", Palette: "aurora", Color: "#ff7a3d", Speed: 0.5, Brightness: 0.7, Yield: true,
-	Custom: []string{"#ff5e3a", "#ffb84d", "#3d8bff"}}
+	Custom: []string{"#ff5e3a", "#ffb84d", "#3d8bff"}, NightFrom: "23:00", NightTo: "07:00"}
+
+// clockMinutes parses "HH:MM" into minutes after midnight.
+func clockMinutes(hm string) (int, bool) {
+	var h, m int
+	if n, err := fmt.Sscanf(hm, "%d:%d", &h, &m); err != nil || n != 2 || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, false
+	}
+	return h*60 + m, true
+}
+
+// isNight reports whether utc falls in the owner's night window (which may cross midnight).
+func (s *settings) isNight(utc time.Time) bool {
+	from, ok1 := clockMinutes(s.NightFrom)
+	to, ok2 := clockMinutes(s.NightTo)
+	if !s.Night || !ok1 || !ok2 || from == to {
+		return false
+	}
+	local := utc.Add(time.Duration(s.TZ) * time.Minute)
+	m := local.Hour()*60 + local.Minute()
+	if from < to {
+		return m >= from && m < to
+	}
+	return m >= from || m < to
+}
 
 func (s *settings) sanitize() {
 	if findEffect(s.Effect) == nil {
@@ -52,6 +89,14 @@ func (s *settings) sanitize() {
 	}
 	s.Speed = clamp01(s.Speed)
 	s.Brightness = clamp01(s.Brightness)
+	s.IdleOff = max(0, min(s.IdleOff, 24*60))
+	if _, ok := clockMinutes(s.NightFrom); !ok {
+		s.NightFrom = defaults.NightFrom
+	}
+	if _, ok := clockMinutes(s.NightTo); !ok {
+		s.NightTo = defaults.NightTo
+	}
+	s.TZ = max(-14*60, min(s.TZ, 14*60))
 }
 
 // palette resolves the chosen palette, building the owner's own one from its colours.
@@ -99,8 +144,10 @@ type engine struct {
 	colFrom  rgb
 	paramMix float64
 
-	power   float64 // smoothed 0..1 master (power switch and brightness)
-	yieldK  float64 // 0..1, 0 while the firmware owns the panel
+	power   float64   // smoothed 0..1 master (power switch and brightness)
+	active  time.Time // last sound or edit: the idle timer counts from here
+	sleep   string    // why the panel is dark now: "", "idle", "night"
+	yieldK  float64   // 0..1, 0 while the firmware owns the panel
 	fw      *firmwareWatch
 	audio   *analyzer // nil without the loopback tap
 	snd     sound
@@ -147,7 +194,14 @@ func (e *engine) update(n settings) settings {
 	}
 	e.set = n
 	e.dirty = time.Now()
+	e.active = e.dirty // any edit wakes the panel
 	return e.set
+}
+
+func (e *engine) view() sleepView {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return sleepView{e.set, e.sleep}
 }
 
 // blendParams returns where the palette/colour fade currently is. Palettes cannot be
@@ -195,8 +249,18 @@ func (e *engine) step(dt float64) (frame, bool) {
 		e.paramMix = math.Min(1, e.paramMix+dt/1.0)
 	}
 
+	now := time.Now()
+	if e.snd.Active || e.active.IsZero() {
+		e.active = now // music (or Alice) keeps the panel awake
+	}
+	e.sleep = ""
+	if e.set.Night && e.set.isNight(now.UTC()) {
+		e.sleep = "night"
+	} else if e.set.IdleOff > 0 && now.Sub(e.active) > time.Duration(e.set.IdleOff)*time.Minute {
+		e.sleep = "idle"
+	}
 	target := 0.0
-	if e.set.Power {
+	if e.set.Power && e.sleep == "" {
 		target = level(e.set.Brightness)
 	}
 	e.power = approach(e.power, target, dt, 0.25)
@@ -222,7 +286,7 @@ func (e *engine) step(dt float64) (frame, bool) {
 	}
 	e.preview = fr
 	// switched off and fully faded: stop writing so the firmware's own idle screen can show
-	off := !e.set.Power && e.power < 1e-4
+	off := (!e.set.Power || e.sleep != "") && e.power < 1e-4
 	return fr, !busy && !off
 }
 
