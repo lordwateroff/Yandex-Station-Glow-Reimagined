@@ -1,0 +1,44 @@
+#!/bin/sh
+# Autostart glow (LED panel light + web panel on :15321). Remove this file to disable.
+#
+# glow reads the speaker feedback on hw:0,1 in place of the dummy arecord that
+# S40adc starts. The firmware's echo cancelling needs that device read at all times,
+# so a guard loop puts the dummy back whenever nobody has hw:0,1 open for a second.
+BIN=/data/opt/glow/glow
+PID=/tmp/glow.pid
+GUARD=/tmp/glow-guard.pid
+LOG=/tmp/glow.log
+STATUS=/proc/asound/card0/pcm1c/sub0/status
+
+guard() {
+  miss=0
+  while :; do
+    sleep 0.5
+    if [ "$(head -c 6 $STATUS 2>/dev/null)" = "closed" ]; then miss=$((miss + 1)); else miss=0; fi
+    if [ $miss -ge 2 ]; then
+      echo "$(date) guard: hw:0,1 unread, restarting the dummy reader" >> $LOG
+      start-stop-daemon -S -b -m -p /var/run/hw_feedback.pid \
+        -x /usr/bin/arecord -- -D hw:0,1 -r 48000 -f S16_LE -c 2 -t raw /dev/null
+      miss=0
+    fi
+  done
+}
+
+case "$1" in
+  start)
+    [ -x "$BIN" ] || exit 0
+    if ! { [ -f "$GUARD" ] && kill -0 "$(cat $GUARD)" 2>/dev/null; }; then
+      guard </dev/null >/dev/null 2>&1 &
+      echo $! > $GUARD
+    fi
+    [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null && exit 0
+    start-stop-daemon -S -b -m -p "$PID" -x /bin/sh -- -c "exec nice -n 5 $BIN >> $LOG 2>&1"
+    ;;
+  stop)
+    # glow hands hw:0,1 back itself; the guard stays to cover a crash
+    [ -f "$PID" ] && kill "$(cat "$PID")" 2>/dev/null
+    rm -f "$PID"
+    ;;
+  restart) "$0" stop; sleep 2; "$0" start ;;
+esac
+exit 0

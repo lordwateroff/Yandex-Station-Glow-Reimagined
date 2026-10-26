@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Пульт подсветки Яндекс Станции 2: эффекты, цвета, яркость и свет под музыку.">
+<meta name="theme-color" content="#151619">
+<title>Свет Станции</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500&family=Manrope:wght@400;500;600&subset=cyrillic&display=swap" rel="stylesheet">
+<style>
+/* Hallmark · shape: app screen · genre: atmospheric · theme: kiln (dealt 1/3, seed phone-remote-speaker-glowing-8c3b·0b0c4bb7·2026-10-26·r0) · kiln: ember · redesign: full · scope: app
+ * nav: top bar, the wordmark and the power switch · signature: the live mirror of the 88 LEDs, the only colour on the screen · states: loading, offline, Alice has the panel, light off
+ * axes: dark/high-contrast-serif/warm · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V3 · weakest: V, the palette strips stay because they are the light's own colours, not decoration */
+/* Hallmark · dropped #colors, #fx, #fxMusic · the effect grids became one list under two tabs (#fxList), the presets #swatches */
+/* Hallmark · owner's request · Unbounded over Manrope replace Boska over Geist: Boska has no Cyrillic and fell back to Times on the Russian page */
+/* Hallmark · owner's request · the neutral charcoal of the speaker's cloth replaces Kiln's warm ground; the hue track is filled with the chosen colour, the frame around the mirror carries the panel's live light */
+/* Hallmark · waive 24b · a 28px thumb on a 2px track · the -13px is centring geometry, not spacing */
+/* Hallmark · answered repeating-stripes · the weave over the mirror is the speaker's own cloth the LEDs shine through */
+
+:root{
+  /* the speaker's charcoal cloth: neutral, faintly cool, so only the light carries colour */
+  --color-paper:#151619; --color-paper-2:#1d1f23; --color-paper-3:#272a30;
+  --color-ink:#ece8e0; --color-ink-2:#d0ccc4; --color-muted:#959aa5;
+  --color-rule:rgba(236,232,224,.1); --color-rule-strong:rgba(236,232,224,.2);
+  --color-accent:oklch(70% 0.2 45); --color-accent-ink:oklch(14% 0.02 40); --color-focus:oklch(76% 0.19 56);
+  --color-off:#3a3d45; --color-led-off:#0b0c0e;
+  --color-scrim:rgba(0,0,0,.5); --color-weave:rgba(0,0,0,.36); --color-vignette:rgba(0,0,0,.6);
+  --shadow-card:0 50px 90px -30px var(--color-scrim);
+  --font-display:"Unbounded",ui-sans-serif,system-ui,sans-serif; --font-body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+  --display-weight:500; --tracking-display:-0.01em;
+  /* type scale 1.2 */
+  --text-sm:0.875rem; --text-base:1rem; --text-md:1.2rem; --text-lg:1.44rem; --text-xl:2.074rem; --text-2xl:2.488rem;
+  /* 4px spacing scale */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px;
+  --radius-card:28px; --radius-well:16px; --radius-pill:999px; --rule-hair:1px;
+  --dur-micro:120ms; --dur-short:200ms; --dur-long:600ms; --ease-out:cubic-bezier(.16,1,.3,1);
+  /* colours a single-colour effect can be set to; the speaker gets these values */
+  --swatch-1:#ffd2a1; --swatch-2:#ff7a3d; --swatch-3:#ff3d5a; --swatch-4:#ff5fb0;
+  --swatch-5:#8a5cff; --swatch-6:#3d8bff; --swatch-7:#3de0ff; --swatch-8:#3dffa8;
+  /* live, set by the script: the panel's average colour and how much light it gives; the chosen colour */
+  --glow:120,200,190; --glow-a:0; --hue-color:var(--swatch-2);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{overflow-x:clip}
+html{background:var(--color-paper);color-scheme:dark;scrollbar-color:var(--color-paper-3) var(--color-paper)}
+body{
+  margin:0;min-height:100dvh;color:var(--color-ink);background:var(--color-paper);
+  font:400 var(--text-base)/1.55 var(--font-body);-webkit-font-smoothing:antialiased;
+  padding:env(safe-area-inset-top) var(--space-4) calc(var(--space-12) + env(safe-area-inset-bottom));
+  caret-color:var(--color-accent);
+}
+::selection{background:color-mix(in oklab,var(--color-accent) 35%,transparent)}
+h1{font-size:var(--text-xl)}
+h1,h2{font-weight:var(--display-weight);margin:0;text-wrap:balance;overflow-wrap:break-word;min-width:0}
+p{margin:0;text-wrap:pretty}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--color-focus);outline-offset:3px}
+
+.wrap{max-width:68rem;margin:0 auto}
+
+/* ---- top bar ---- */
+.bar{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding:var(--space-4) 0}
+.mark{display:flex;align-items:baseline;gap:var(--space-2)}
+.mark b{font:var(--display-weight) var(--text-md)/1 var(--font-display);letter-spacing:var(--tracking-display)}
+.mark span{font-size:var(--text-sm);color:var(--color-muted)}
+
+/* ---- switches (power, yield) ---- */
+.switch{
+  appearance:none;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:var(--space-3);
+  min-height:44px;padding:0 var(--space-4) 0 var(--space-2);border-radius:var(--radius-pill);background:transparent;
+  box-shadow:inset 0 0 0 var(--rule-hair) var(--color-rule);font-size:var(--text-sm);font-weight:500;
+  transition:background-color var(--dur-short) var(--ease-out);
+}
+.switch:hover{background:var(--color-paper-2)}
+.switch:active{background:var(--color-paper-3)}
+.switch:disabled{opacity:.45;cursor:not-allowed}
+.knob{position:relative;width:44px;height:28px;border-radius:var(--radius-pill);background:var(--color-off);flex:none;transition:background-color var(--dur-short) var(--ease-out)}
+.knob::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--color-ink);transition:transform var(--dur-short) var(--ease-out)}
+[aria-checked="true"] .knob{background:var(--color-accent)}
+[aria-checked="true"] .knob::after{transform:translateX(16px);background:var(--color-accent-ink)}
+
+/* ---- layout ---- */
+.screen{display:grid;gap:var(--space-8)}
+@media (min-width:56rem){
+  .screen{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-12);align-items:start}
+  .stage{position:sticky;top:var(--space-4)}
+}
+
+/* ---- the panel mirror ---- */
+.stage{margin:0}
+.mirror{
+  position:relative;aspect-ratio:15/13;border-radius:var(--radius-card);overflow:hidden;
+  background:var(--color-led-off);
+  box-shadow:0 30px 80px -30px rgba(var(--glow),calc(var(--glow-a)*.9)),var(--shadow-card);
+  outline:var(--rule-hair) solid var(--color-rule);outline-offset:-1px;
+}
+.mirror canvas{position:absolute;inset:0;width:100%;height:100%;filter:blur(7px) saturate(1.1)}
+.mirror::after{ /* the speaker's cloth the light shines through */
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    repeating-linear-gradient(45deg,var(--color-weave) 0 1.5px,transparent 1.5px 4px),
+    repeating-linear-gradient(-45deg,var(--color-weave) 0 1.5px,transparent 1.5px 4px),
+    radial-gradient(130% 110% at 50% 50%,transparent 55%,var(--color-vignette) 100%);
+}
+.offline .mirror canvas{opacity:.35}
+.caption{display:grid;gap:var(--space-2);padding:var(--space-5) var(--space-1) 0}
+h1.now{font:var(--display-weight) var(--text-xl)/1.1 var(--font-display);letter-spacing:var(--tracking-display)}
+.desc{color:var(--color-ink-2);max-width:40ch}
+.status{min-height:1lh;font-size:var(--text-sm);color:var(--color-muted)}
+.status button{
+  appearance:none;border:0;background:none;padding:0;margin-left:var(--space-2);cursor:pointer;
+  color:var(--color-ink);text-decoration:underline;text-underline-offset:.2em;text-decoration-thickness:1px;
+}
+
+/* ---- sections ---- */
+.controls{display:grid;gap:var(--space-8)}
+.group{display:grid;gap:var(--space-3)}
+h2{font:500 var(--text-md)/1.3 var(--font-body);color:var(--color-ink)}
+.well{background:var(--color-paper-2);border:var(--rule-hair) solid var(--color-rule);border-radius:var(--radius-well)}
+
+/* tabs */
+.tabs{display:inline-flex;padding:var(--space-1);gap:var(--space-1);border-radius:var(--radius-pill);background:var(--color-paper-2);box-shadow:inset 0 0 0 var(--rule-hair) var(--color-rule);justify-self:start}
+.tabs button{
+  appearance:none;border:0;cursor:pointer;min-height:40px;padding:0 var(--space-4);border-radius:var(--radius-pill);
+  background:transparent;color:var(--color-muted);font-size:var(--text-sm);font-weight:500;
+  transition:background-color var(--dur-short) var(--ease-out),color var(--dur-short) var(--ease-out);
+}
+.tabs button:hover{color:var(--color-ink)}
+.tabs button:active{background:var(--color-paper-3)}
+.tabs button[aria-selected="true"]{background:var(--color-paper-3);color:var(--color-ink)}
+
+/* effect rows */
+.rows{list-style:none;margin:0;padding:0;overflow:hidden}
+.rows li + li{border-top:var(--rule-hair) solid var(--color-rule)}
+.row{
+  appearance:none;border:0;background:transparent;cursor:pointer;width:100%;text-align:left;
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-4);
+  min-height:72px;padding:var(--space-3) var(--space-4) var(--space-3) var(--space-3);
+  transition:background-color var(--dur-short) var(--ease-out);
+}
+.row:hover{background:var(--color-paper-3)}
+.row:active{background:var(--color-paper)}
+.row:disabled{opacity:.45;cursor:not-allowed}
+.row b{display:block;font-weight:500}
+.row small{display:block;font-size:var(--text-sm);color:var(--color-muted);line-height:1.4}
+.thumb{display:block;width:64px;height:56px;border-radius:var(--space-3);background:var(--color-led-off);filter:blur(1.2px) saturate(1.1);outline:var(--rule-hair) solid var(--color-rule);outline-offset:-1px}
+.skeleton .thumb{background:var(--color-paper-3);filter:none}
+.tick{width:24px;height:24px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--color-rule-strong);display:grid;place-items:center}
+.tick svg{width:14px;height:14px}
+.row[aria-checked="true"] .tick{background:var(--color-accent);box-shadow:none}
+.tick path{stroke:var(--color-accent-ink)}
+.skeleton .row{cursor:default}
+.skeleton b,.skeleton small{background:var(--color-paper-3);border-radius:var(--space-1);color:transparent}
+.skeleton b{width:40%}.skeleton small{width:70%;margin-top:var(--space-1)}
+
+/* palettes */
+.pals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-2)}
+@media (min-width:30rem){.pals{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.pal{
+  appearance:none;border:0;cursor:pointer;text-align:left;display:grid;gap:var(--space-2);
+  padding:var(--space-3);border-radius:var(--radius-well);background:var(--color-paper-2);
+  box-shadow:inset 0 0 0 var(--rule-hair) var(--color-rule);font-size:var(--text-sm);
+  transition:background-color var(--dur-short) var(--ease-out),box-shadow var(--dur-short) var(--ease-out);
+}
+.pal:hover{background:var(--color-paper-3)}
+.pal:active{background:var(--color-paper)}
+.pal i{display:block;height:24px;border-radius:var(--radius-pill)}
+.pal[aria-checked="true"]{box-shadow:inset 0 0 0 2px var(--color-accent)}
+
+/* single colours */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:var(--space-2)}
+/* a native colour picker under a round face: the input covers the face, so a tap opens it */
+.picker{position:relative;display:grid;place-items:center;cursor:pointer}
+.picker input{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;padding:0;cursor:pointer;opacity:.001}
+.picker svg{width:18px;height:18px;stroke:var(--color-ink);pointer-events:none}
+.picker[data-set="true"] svg{display:none}
+.own{display:grid;gap:var(--space-3);padding:var(--space-3)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--space-3)}
+.chip{width:44px;height:44px;border-radius:50%;box-shadow:inset 0 0 0 var(--rule-hair) var(--color-rule-strong)}
+.own-actions{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.ghost{
+  appearance:none;border:0;cursor:pointer;min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-pill);
+  background:transparent;box-shadow:inset 0 0 0 var(--rule-hair) var(--color-rule-strong);font-size:var(--text-sm);font-weight:500;
+  transition:background-color var(--dur-short) var(--ease-out);
+}
+.ghost:hover{background:var(--color-paper-3)}
+.ghost:active{background:var(--color-paper)}
+.ghost:disabled{opacity:.4;cursor:not-allowed}
+.hue{padding:var(--space-2) var(--space-4) var(--space-1)}
+.hue input::-webkit-slider-runnable-track{height:6px;border-radius:var(--radius-pill);background:var(--hue-color)}
+.hue input::-moz-range-track{height:6px;border-radius:var(--radius-pill);background:var(--hue-color)}
+.hue input::-moz-range-progress{background:transparent}
+.hue input::-webkit-slider-thumb{margin-top:-11px;background:var(--color-ink)}
+.hue input::-moz-range-thumb{background:var(--color-ink)}
+.sw{
+  appearance:none;border:0;cursor:pointer;aspect-ratio:1;min-height:44px;border-radius:50%;
+  box-shadow:inset 0 0 0 var(--rule-hair) var(--color-rule-strong);transition:transform var(--dur-micro) var(--ease-out);
+}
+.sw:active{transform:scale(.92)}
+.sw[aria-checked="true"]{box-shadow:0 0 0 3px var(--color-paper),0 0 0 5px var(--color-ink)}
+
+/* sliders */
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:var(--space-1) var(--space-4);padding:var(--space-4)}
+.slider + .slider{border-top:var(--rule-hair) solid var(--color-rule)}
+.slider label{font-weight:500}
+.slider output{font:500 var(--text-md)/1 var(--font-body);font-variant-numeric:tabular-nums}
+.slider input{grid-column:1/-1}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:44px;background:none;margin:0;cursor:pointer;--fill:50%}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:linear-gradient(to right,var(--color-accent) var(--fill),var(--color-rule-strong) var(--fill))}
+input[type=range]::-moz-range-track{height:2px;background:var(--color-rule-strong)}
+input[type=range]::-moz-range-progress{height:2px;background:var(--color-accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-13px;border-radius:50%;background:var(--color-accent);transition:transform var(--dur-micro) var(--ease-out)}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border:0;border-radius:50%;background:var(--color-accent)}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.12)}
+input[type=range]:focus-visible{outline-offset:0}
+
+.yield{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-4);padding:var(--space-4)}
+.yield p{font-size:var(--text-sm);color:var(--color-muted)}
+.yield b{display:block;font-size:var(--text-base);font-weight:500;color:var(--color-ink)}
+.yield .switch{box-shadow:none;padding:0}
+.yield .switch:hover,.yield .switch:active{background:transparent}
+
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="mark"><b>Свет</b><span>Станция 2</span></div>
+    <button class="switch" id="power" role="switch" aria-checked="true" disabled>
+      <span class="knob" aria-hidden="true"></span><span id="powerText">Свет включён</span>
+    </button>
+  </header>
+
+  <main class="screen">
+    <figure class="stage">
+      <div class="mirror"><canvas id="panel" width="600" height="520" aria-label="Что сейчас горит на колонке"></canvas></div>
+      <figcaption class="caption">
+        <h1 class="now" id="now">Подключаюсь</h1>
+        <p class="desc" id="desc">Колонка отдаёт настройки и картинку панели.</p>
+        <p class="status" id="status" aria-live="polite"></p>
+      </figcaption>
+    </figure>
+
+    <div class="controls">
+      <section class="group" aria-labelledby="fxHead">
+        <h2 id="fxHead">Эффект</h2>
+        <div class="tabs" role="tablist" aria-label="Вид эффектов">
+          <button type="button" role="tab" id="tabMusic" aria-selected="true" aria-controls="fxList">Под музыку</button>
+          <button type="button" role="tab" id="tabCalm" aria-selected="false" aria-controls="fxList">Спокойный свет</button>
+        </div>
+        <ul class="rows well skeleton" id="fxList" role="radiogroup" aria-labelledby="fxHead">
+          <li><div class="row"><span class="thumb"></span><span><b>Эффект</b><small>Описание эффекта</small></span></div></li>
+          <li><div class="row"><span class="thumb"></span><span><b>Эффект</b><small>Описание эффекта</small></span></div></li>
+          <li><div class="row"><span class="thumb"></span><span><b>Эффект</b><small>Описание эффекта</small></span></div></li>
+        </ul>
+      </section>
+
+      <section class="group" id="palSec" aria-labelledby="palHead" hidden>
+        <h2 id="palHead">Цвета</h2>
+        <div class="pals" id="pals" role="radiogroup" aria-labelledby="palHead"></div>
+        <div class="well own" id="own" hidden>
+          <div class="chips" id="chips"></div>
+          <div class="own-actions">
+            <button type="button" class="ghost" id="ownAdd">Добавить цвет</button>
+            <button type="button" class="ghost" id="ownDel">Убрать последний</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="group" id="colSec" aria-labelledby="colHead" hidden>
+        <h2 id="colHead">Цвет</h2>
+        <div class="swatches" id="swatches" role="radiogroup" aria-labelledby="colHead"></div>
+        <div class="well slider hue"><label for="hue">Оттенок</label><output id="hueOut" for="hue"></output><input type="range" id="hue" min="0" max="359" step="1"></div>
+      </section>
+
+      <section class="group" aria-labelledby="lightHead">
+        <h2 id="lightHead">Настройки</h2>
+        <div class="well">
+          <div class="slider"><label for="bri">Яркость</label><output id="briOut" for="bri"></output><input type="range" id="bri" min="2" max="100" step="1" disabled></div>
+          <div class="slider"><label for="spd">Скорость</label><output id="spdOut" for="spd"></output><input type="range" id="spd" min="0" max="100" step="1" disabled></div>
+          <div class="yield slider">
+            <p><b id="yieldLabel">Уступать Алисе</b>Пока Алиса слушает и отвечает, панель показывает её анимацию</p>
+            <button class="switch" id="yield" role="switch" aria-checked="true" aria-labelledby="yieldLabel" disabled><span class="knob" aria-hidden="true"></span></button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const css = getComputedStyle(document.documentElement);
+const token = name => css.getPropertyValue(name).trim();
+
+// what each effect looks like, in words; names come from the speaker
+const DESC = {
+  aurora:  "Шторы света медленно плывут по панели",
+  flow:    "Вся панель неспешно меняет цвет",
+  breathe: "Один цвет плавно гаснет и разгорается",
+  waves:   "Кольца света расходятся от центра",
+  swirl:   "Цвета кружат вокруг логотипа",
+  lava:    "Мягкие пятна сливаются и расходятся",
+  candle:  "Тёплое пламя поднимается снизу",
+  static:  "Ровный свет одного цвета",
+  spectrum:"Полосы пляшут под музыку, басы в центре",
+  pulse:   "Свет вспыхивает и расходится в такт басам",
+  mirror:  "Полосы растут от середины вверх и вниз",
+  rings:   "Частоты кругами: басы у логотипа, высокие по краям",
+  voice:   "Мягкая волна по центру, как у Алисы, когда она говорит",
+  peaks:   "Полосы с яркими пиками, которые медленно опускаются",
+};
+const SWATCHES = Array.from({length:8}, (_, i) => token(`--swatch-${i+1}`));
+const CHECK = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.5l2.6 2.5L11 4.5" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// LED positions on the 15x13 checkerboard (same table as the speaker uses)
+const LAYOUT = (() => {
+  const l = [], odd = [1,3,5,7,9,11,13], even = [0,2,4,6,8,10,12,14];
+  const row = (y, xs) => xs.forEach(x => l.push([x, y]));
+  row(0,odd); row(1,even); row(2,odd); row(3,even); row(4,odd);
+  row(5,[0,2,12,14]); row(6,[1,13]); row(7,[0,2,12,14]);
+  row(8,odd); row(9,even); row(10,odd); row(11,even); row(12,odd);
+  l.push([8,7],[6,7],[6,5],[8,5]);
+  return l;
+})();
+
+let cat = null, st = null, sending = null, pending = null, tab = "music";
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {});
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// coalesce rapid slider moves into one request at a time
+function push(patch) {
+  pending = Object.assign(pending || {}, patch);
+  Object.assign(st, patch);
+  render();
+  if (sending) return;
+  sending = (async () => {
+    while (pending) {
+      const p = pending; pending = null;
+      try { st = Object.assign(await api("/api/state", p), pending || {}); }
+      catch (e) { setStatus("Колонка не приняла настройку: " + e.message); }
+    }
+    sending = null;
+  })();
+}
+
+function radio(cls, html, checked, onPick, label) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = cls; b.innerHTML = html;
+  b.setAttribute("role", "radio"); b.setAttribute("aria-checked", checked);
+  if (label) b.setAttribute("aria-label", label);
+  b.onclick = onPick;
+  return b;
+}
+
+function setTab(name) {
+  tab = name;
+  $("tabMusic").setAttribute("aria-selected", name === "music");
+  $("tabCalm").setAttribute("aria-selected", name !== "music");
+  render();
+}
+$("tabMusic").onclick = () => setTab("music");
+$("tabCalm").onclick = () => setTab("calm");
+
+function sliderFill(el) { el.style.setProperty("--fill", ((el.value - el.min) / (el.max - el.min) * 100) + "%"); }
+
+function render() {
+  if (!cat || !st) return;
+  const fx = cat.effects.find(e => e.id === st.effect) || cat.effects[0];
+  $("now").textContent = fx.name;
+  $("desc").textContent = DESC[fx.id] || "";
+
+  const list = $("fxList");
+  list.classList.remove("skeleton");
+  list.textContent = "";
+  for (const e of cat.effects.filter(e => !!e.music === (tab === "music"))) {
+    const li = document.createElement("li");
+    li.append(radio("row", `<canvas class="thumb" width="64" height="56" data-fx="${e.id}" aria-hidden="true"></canvas><span><b>${e.name}</b><small>${DESC[e.id] || ""}</small></span><span class="tick">${e.id === st.effect ? CHECK : ""}</span>`,
+      e.id === st.effect, () => push({effect:e.id})));
+    list.append(li);
+  }
+  thumbs = new Map([...list.querySelectorAll("canvas[data-fx]")].map(c => [c.dataset.fx, c]));
+  for (const [id, c] of thumbs) if (lastThumb.has(id)) drawDots(c, lastThumb.get(id), 0);
+  previews(cat.effects.filter(e => !!e.music === (tab === "music")).map(e => e.id).join(","));
+
+  $("palSec").hidden = !fx.palette;
+  $("colSec").hidden = !fx.color;
+
+  const pals = $("pals"); pals.textContent = "";
+  for (const p of cat.palettes) {
+    const b = radio("pal", `<i></i>${p.name}`, p.id === st.palette, () => push({palette:p.id}));
+    b.querySelector("i").style.background = `linear-gradient(90deg,${p.colors.concat(p.colors[0]).join(",")})`;
+    pals.append(b);
+  }
+  const own = radio("pal", `<i></i>Своя`, st.palette === "custom", () => push({palette:"custom"}));
+  own.querySelector("i").style.background = `linear-gradient(90deg,${st.custom.concat(st.custom[0]).join(",")})`;
+  pals.append(own);
+  renderOwn(fx);
+
+  renderSwatches();
+
+  if (document.activeElement !== $("hue")) $("hue").value = hexToHue(st.color);
+  $("hueOut").textContent = st.color.toUpperCase();
+  document.documentElement.style.setProperty("--hue-color", st.color);
+
+  for (const [id, v] of [["bri", Math.round(st.brightness*100)], ["spd", Math.round(st.speed*100)]]) {
+    const el = $(id);
+    el.disabled = false;
+    if (document.activeElement !== el) el.value = v;
+    sliderFill(el);
+  }
+  $("briOut").textContent = Math.round(st.brightness*100) + "%";
+  $("spdOut").textContent = "×" + Math.pow(4, 2*st.speed - 1).toFixed(2).replace(/\.?0+$/,"");
+
+  const y = $("yield"); y.disabled = false; y.setAttribute("aria-checked", st.yield);
+  const pw = $("power"); pw.disabled = false; pw.setAttribute("aria-checked", st.power);
+  $("powerText").textContent = st.power ? "Свет включён" : "Свет выключен";
+}
+
+const PLUS = '<svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3v12M3 9h12" fill="none" stroke-width="2" stroke-linecap="round"/></svg>';
+
+// preset swatches plus one picker for any colour; built once, then only their state changes
+function renderSwatches() {
+  const sw = $("swatches");
+  if (!sw.children.length) {
+    for (const c of SWATCHES) {
+      const b = radio("sw", "", false, () => push({color:c}), c);
+      b.style.background = c; b.dataset.c = c;
+      sw.append(b);
+    }
+    const lab = document.createElement("label");
+    lab.className = "sw picker"; lab.setAttribute("role", "radio"); lab.setAttribute("aria-label", "Свой цвет");
+    lab.innerHTML = PLUS + '<input type="color" id="pick" aria-label="Свой цвет">';
+    lab.querySelector("input").oninput = e => push({color: e.target.value});
+    sw.append(lab);
+  }
+  const cur = st.color.toLowerCase(), preset = SWATCHES.some(c => c.toLowerCase() === cur);
+  for (const b of sw.querySelectorAll("button.sw")) b.setAttribute("aria-checked", b.dataset.c.toLowerCase() === cur);
+  const lab = sw.querySelector(".picker"), pick = $("pick");
+  lab.setAttribute("aria-checked", !preset);
+  lab.dataset.set = !preset;
+  lab.style.background = preset ? "" : st.color;
+  if (document.activeElement !== pick) pick.value = st.color;
+}
+
+// the own palette: 2 to 5 colours, each a native picker
+function renderOwn(fx) {
+  $("own").hidden = !fx.palette || st.palette !== "custom";
+  const chips = $("chips");
+  if (chips.children.length !== st.custom.length) {
+    chips.textContent = "";
+    st.custom.forEach((c, i) => {
+      const lab = document.createElement("label");
+      lab.className = "chip picker";
+      lab.innerHTML = `<input type="color" aria-label="Цвет ${i+1} своей палитры">`;
+      lab.querySelector("input").oninput = e => {
+        const next = st.custom.slice(); next[i] = e.target.value;
+        push({custom: next, palette: "custom"});
+      };
+      chips.append(lab);
+    });
+  }
+  [...chips.children].forEach((lab, i) => {
+    lab.style.background = st.custom[i];
+    const inp = lab.querySelector("input");
+    if (document.activeElement !== inp) inp.value = st.custom[i];
+  });
+  $("ownAdd").disabled = st.custom.length >= 5;
+  $("ownDel").disabled = st.custom.length <= 2;
+}
+$("ownAdd").onclick = () => {
+  const last = st.custom[st.custom.length - 1];
+  push({custom: st.custom.concat(hueToHex((hexToHue(last) + 70) % 360)), palette: "custom"});
+};
+$("ownDel").onclick = () => push({custom: st.custom.slice(0, -1), palette: "custom"});
+
+function hexToHue(hex) {
+  const n = parseInt(hex.slice(1), 16), r = (n>>16&255)/255, g = (n>>8&255)/255, b = (n&255)/255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx - mn;
+  if (!d) return 0;
+  const h = mx === r ? ((g-b)/d) % 6 : mx === g ? (b-r)/d + 2 : (r-g)/d + 4;
+  return Math.round((h*60 + 360) % 360);
+}
+function hueToHex(h) { // saturated, lightness 55%
+  const f = n => { const k = (n + h/30) % 12;
+    return Math.round(255*(.55 - .45*Math.max(-1, Math.min(k-3, 9-k, 1)))).toString(16).padStart(2,"0"); };
+  return "#" + f(0) + f(8) + f(4);
+}
+$("hue").oninput = e => push({color: hueToHex(+e.target.value)});
+$("bri").oninput = e => push({brightness: e.target.value/100});
+$("spd").oninput = e => push({speed: e.target.value/100});
+$("yield").onclick = () => push({yield: !st.yield});
+$("power").onclick = () => push({power: !st.power});
+
+// ---- live mirror ----
+const cv = $("panel"), ctx = cv.getContext("2d");
+const LED_OFF = token("--color-led-off");
+let statusText = "";
+function setStatus(t, retry) {
+  if (t === statusText && !retry) return;
+  statusText = t;
+  const s = $("status"); s.textContent = t;
+  if (retry) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = "Повторить"; b.onclick = start;
+    s.append(b);
+  }
+}
+
+// draws 88 LED colours (hex, from offset `at` in `line`) onto a canvas; returns their sum
+function drawDots(c, line, at) {
+  const g2 = c.getContext("2d"), W = c.width, H = c.height, sx = W/15, sy = H/13, big = W > 200;
+  g2.globalCompositeOperation = "source-over";
+  g2.fillStyle = LED_OFF; g2.fillRect(0,0,W,H);
+  g2.globalCompositeOperation = "lighter";
+  let ar = 0, ag = 0, ab = 0;
+  for (let i = 0; i < 88; i++) {
+    const n = parseInt(line.substr(at + i*6, 6), 16);
+    if (!n) continue;
+    const r = n>>16&255, g = n>>8&255, b = n&255;
+    ar += r; ag += g; ab += b;
+    const [x, y] = LAYOUT[i], cx = (x+.5)*sx, cy = (y+.5)*sy;
+    if (big) {
+      const rad = sx*1.45, gr = g2.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      gr.addColorStop(0, `rgba(${r},${g},${b},1)`);
+      gr.addColorStop(.35, `rgba(${r},${g},${b},.55)`);
+      gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      g2.fillStyle = gr; g2.fillRect(cx-rad, cy-rad, rad*2, rad*2);
+    } else { // thumbnails: a plain dot each, the CSS blur does the diffuser
+      g2.fillStyle = `rgb(${r},${g},${b})`;
+      g2.fillRect(cx - sx*.7, cy - sy*.7, sx*1.4, sy*1.4);
+    }
+  }
+  return [ar, ag, ab];
+}
+
+// effect thumbnails: one stream for the tab on screen, drawn by the speaker's own engine
+let thumbs = new Map(), lastThumb = new Map(), pv = null, pvIds = "";
+function previews(ids) {
+  if (ids === pvIds && pv) return;
+  if (pv) pv.close();
+  pvIds = ids; pv = null;
+  if (!ids || document.hidden) return;
+  pv = new EventSource("/api/previews?ids=" + encodeURIComponent(ids));
+  pv.onmessage = ev => {
+    for (const part of ev.data.split(";")) {
+      const eq = part.indexOf("="), id = part.slice(0, eq), hex = part.slice(eq + 1);
+      lastThumb.set(id, hex);
+      const c = thumbs.get(id);
+      if (c) drawDots(c, hex, 0);
+    }
+  };
+}
+
+function draw(line) {
+  const alice = line[0] === "A";
+  const [ar, ag, ab] = drawDots(cv, line, 1);
+  // the page is lit by the panel: its average colour washes the top of the screen and the frame
+  const m = Math.max(ar, ag, ab, 1), root = document.documentElement.style;
+  root.setProperty("--glow", `${Math.round(ar/m*255)},${Math.round(ag/m*255)},${Math.round(ab/m*255)}`);
+  root.setProperty("--glow-a", Math.min(1, m/88/150).toFixed(3));
+  setStatus(alice ? "Сейчас панель у Алисы, свет вернётся, когда она закончит" : st && !st.power ? "Свет выключен, панель отдана колонке" : "");
+}
+
+let es = null;
+function live() {
+  if (es) es.close();
+  es = new EventSource("/api/live");
+  es.onmessage = ev => { document.body.classList.remove("offline"); draw(ev.data); };
+  es.onerror = () => { document.body.classList.add("offline"); setStatus("Нет связи с колонкой, переподключаюсь"); };
+}
+// the stream is the only steady load on the speaker: stop it while the page is hidden
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { if (es) { es.close(); es = null; } if (pv) { pv.close(); pv = null; } }
+  else if (cat) { live(); const ids = pvIds; pvIds = ""; previews(ids); }
+});
+
+async function start() {
+  setStatus("");
+  try {
+    [cat, st] = await Promise.all([api("/api/catalog"), api("/api/state")]);
+    const cur = cat.effects.find(e => e.id === st.effect);
+    tab = cur && !cur.music ? "calm" : "music";
+    setTab(tab);
+    live();
+  } catch (e) {
+    document.body.classList.add("offline");
+    $("now").textContent = "Нет связи";
+    $("desc").textContent = "Колонка не ответила. Телефон должен быть в той же Wi-Fi сети, что и колонка.";
+    setStatus("", true);
+  }
+}
+start();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Autostart yamd (YAM plugin daemon, runs station-airplay). Remove this file to disable.
+# Local-only API: the panel on 8099 has no password. --model: yamd cannot detect Station 2 itself.
+P=/data/quazar/yam
+case "$1" in
+  start)
+    [ -x "$P/bin/yamd" ] || exit 0
+    start-stop-daemon --start --background --make-pidfile --pidfile "$P/yamd.pid" \
+      --startas "$P/bin/yamd" -- --listen 127.0.0.1:8099 --data-dir "$P/data" --model yandexstation_2
+    ;;
+  stop) killall yamd 2>/dev/null ;;
+esac
+exit 0

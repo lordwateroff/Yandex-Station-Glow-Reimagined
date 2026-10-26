@@ -1,0 +1,4 @@
+build/
+.hallmark/
+*.log
+devices.json
